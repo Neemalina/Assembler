@@ -11,9 +11,14 @@ import sys
 class UVMAssembler:
     def __init__(self):
         self.mnemonics = {
+            # Основные команды
             'LOAD_CONST': 20,
             'STORE': 12,
-            'BINARY_OP': 19
+            'BINARY_OP': 19,
+            # Русские команды
+            'ФОТ': 23,  # Альтернативная загрузка константы
+            'ФАС': 12,  # Альтернативная запись
+            'ФЭЗ': 19  # Альтернативная бинарная операция
         }
 
     def parse_line(self, line):
@@ -29,7 +34,7 @@ class UVMAssembler:
             line = line.split(';')[0].strip()
 
         parts = line.split()
-        mnemonic = parts[0].upper()
+        mnemonic = parts[0]
         args = []
 
         if len(parts) > 1:
@@ -59,32 +64,36 @@ class UVMAssembler:
         intermediate_representation = []
 
         for mnemonic, args in parsed_commands:
+            # Проверяем мнемонику (без приведения к верхнему регистру для русских команд)
             if mnemonic not in self.mnemonics:
                 raise ValueError(f"Неизвестная мнемоника: {mnemonic}")
 
-            if mnemonic == 'LOAD_CONST':
+            if mnemonic in ['LOAD_CONST', 'ФОТ']:
                 if len(args) != 2:
-                    raise ValueError("LOAD_CONST требует 2 аргумента: адрес, константа")
+                    raise ValueError(f"{mnemonic} требует 2 аргумента: адрес, константа")
                 command = {
+                    'type': mnemonic,
                     'A': self.mnemonics[mnemonic],
                     'B': self._parse_number(args[0]),
                     'C': self._parse_number(args[1])
                 }
 
-            elif mnemonic == 'STORE':
+            elif mnemonic in ['STORE', 'ФАС']:
                 if len(args) != 2:
-                    raise ValueError("STORE требует 2 аргумента: адрес_источник, адрес_назначение")
+                    raise ValueError(f"{mnemonic} требует 2 аргумента: адрес_источник, адрес_назначение")
                 command = {
+                    'type': mnemonic,
                     'A': self.mnemonics[mnemonic],
                     'B': self._parse_number(args[0]),
                     'C': self._parse_number(args[1])
                 }
 
-            elif mnemonic == 'BINARY_OP':
+            elif mnemonic in ['BINARY_OP', 'ФЭЗ']:
                 if len(args) != 4:
                     raise ValueError(
-                        "BINARY_OP требует 4 аргумента: адрес_результата, адрес_операнда2, смещение, базовый_адрес")
+                        f"{mnemonic} требует 4 аргумента: адрес_результата, адрес_операнда2, смещение, базовый_адрес")
                 command = {
+                    'type': mnemonic,
                     'A': self.mnemonics[mnemonic],
                     'B': self._parse_number(args[0]),
                     'C': self._parse_number(args[1]),
@@ -133,6 +142,27 @@ def run_specification_tests():
     ir3 = assembler.assemble(source3)[0]
     print(f"Получено:  A={ir3['A']}, B={ir3['B']}, C={ir3['C']}, D={ir3['D']}, E={ir3['E']}")
 
+    # Тест 4: Русская команда ФОТ (A=23, B=811, C=213)
+    print("\nТест 4: ФОТ")
+    print("Ожидается: A=23, B=811, C=213")
+    source4 = "ФОТ 811, 213"
+    ir4 = assembler.assemble(source4)[0]
+    print(f"Получено:  A={ir4['A']}, B={ir4['B']}, C={ir4['C']}")
+
+    # Тест 5: Русская команда ФАС (A=12, B=709, C=447)
+    print("\nТест 5: ФАС")
+    print("Ожидается: A=12, B=709, C=447")
+    source5 = "ФАС 709, 447"
+    ir5 = assembler.assemble(source5)[0]
+    print(f"Получено:  A={ir5['A']}, B={ir5['B']}, C={ir5['C']}")
+
+    # Тест 6: Русская команда ФЭЗ (A=19, B=132, C=412, D=20, E=585)
+    print("\nТест 6: ФЭЗ")
+    print("Ожидается: A=19, B=132, C=412, D=20, E=585")
+    source6 = "ФЭЗ 132, 412, 20, 585"
+    ir6 = assembler.assemble(source6)[0]
+    print(f"Получено:  A={ir6['A']}, B={ir6['B']}, C={ir6['C']}, D={ir6['D']}, E={ir6['E']}")
+
     print("\n" + "=" * 60)
     print("ВСЕ ТЕСТЫ ПРОЙДЕНЫ УСПЕШНО!")
     print("=" * 60)
@@ -149,7 +179,7 @@ def main():
     assembler = UVMAssembler()
 
     try:
-        # Чтение исходного файла
+        # Чтение исходного файла с правильной кодировкой
         with open(args.input_file, 'r', encoding='utf-8') as f:
             source_code = f.read()
 
@@ -165,10 +195,9 @@ def main():
             print("=" * 50)
 
         # Запись в двоичный файл (заглушка для данного этапа)
-        with open(args.output_file, 'wb') as f:
-            # На этапе 1 просто сохраняем текстовое представление
+        with open(args.output_file, 'w', encoding='utf-8') as f:
             for command in intermediate_representation:
-                f.write(str(command).encode('utf-8') + b'\n')
+                f.write(str(command) + '\n')
 
         print(f"Ассемблирование завершено. Результат записан в {args.output_file}")
 
